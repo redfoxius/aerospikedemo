@@ -18,8 +18,8 @@ services:
     depends_on:
       - aerospike
     environment:
-      - AEROSPIC_HOST=aerospike
-      - AEROSPIC_PORT=3000
+      - AEROSPIKE_HOST=aerospike
+      - AEROSPIKE_PORT=3005
     networks:
       - backend
 
