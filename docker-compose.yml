@@ -3,20 +3,20 @@ services:
     image: aerospike/aerospike-server:latest
     ports:
       - "3000:3000"
-      - "3001:3001"
-      - "3002:3002"
     ulimits:
       nofile:
         soft: 15000
         hard: 15000
-
-  go-app:
+    volumes:
+      - ./aerospike.conf:/etc/aerospike/aerospike.conf
+  app:
     build: .
-    ports:
-      - "8080:8080"
     depends_on:
       - aerospike
     environment:
       - AEROSPIKE_HOST=aerospike
       - AEROSPIKE_PORT=3000
+      - AEROSPIKE_NAMESPACE=test
     restart: on-failure
+    volumes:
+      - .:/app/app

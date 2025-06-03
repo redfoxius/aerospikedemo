@@ -60,7 +60,7 @@ func (s *Service) GetAllResults() {
 	}
 
 	// If the file doesn't exist, create it, or append to the file
-	f, er := os.OpenFile("result.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	f, er := os.OpenFile("app/result.txt", os.O_CREATE|os.O_WRONLY, 0644)
 	if er != nil {
 		log.Fatal(err)
 	}
@@ -72,8 +72,7 @@ func (s *Service) GetAllResults() {
 			log.Printf("Error reading record: %v", rec.Err)
 			continue
 		}
-		row := rec.Record.Bins[s.Config.Bin].(aerospike.Bin)
-		if _, err := f.Write([]byte(fmt.Sprintf("%s , count=%s", row.Name, row.Value.String()))); err != nil {
+		if _, err := f.Write([]byte(fmt.Sprintf("%s , count=%s", rec.Record.Key.String(), rec.Record.Bins[s.Config.Bin].(int)))); err != nil {
 			log.Fatal(err)
 		}
 	}

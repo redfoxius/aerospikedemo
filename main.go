@@ -4,6 +4,8 @@ import (
 	cfg "aerospikedemo/internal/app/config"
 	"aerospikedemo/internal/app/services/writer"
 	"bufio"
+	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"strings"
@@ -12,6 +14,13 @@ import (
 
 func main() {
 	start := time.Now()
+	log.Printf("Application is started at %s\n", start)
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Println(err.Error())
+		//log.Fatal("Error loading .env file")
+	}
 
 	//f, err := os.OpenFile("testlogfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	//if err != nil {
@@ -33,7 +42,17 @@ func main() {
 	log.Println(config.Host)
 	log.Println(config.Port)
 
-	file, err := os.Open("out.txt")
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		fmt.Println("Error reading directory:", err)
+		return
+	}
+
+	for _, entry := range entries {
+		fmt.Println(entry.Name(), entry.IsDir())
+	}
+
+	file, err := os.Open("app/new.txt")
 	if err != nil {
 		log.Fatalf("failed to open file: %s", err)
 	}
