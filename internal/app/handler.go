@@ -2,7 +2,6 @@ package app
 
 import (
 	"aerospikedemo/internal/app/config"
-	"aerospikedemo/internal/app/services/reader"
 	"aerospikedemo/internal/app/services/writer"
 	"bufio"
 	"bytes"
@@ -16,7 +15,6 @@ import (
 
 type Handler struct {
 	writerService *writer.Service
-	readerService *reader.Service
 
 	config *config.Config
 }
@@ -24,7 +22,6 @@ type Handler struct {
 func NewHandler(cfg *config.Config) *Handler {
 	return &Handler{
 		writerService: writer.NewWriterService(cfg),
-		readerService: reader.NewReaderService(cfg),
 		config:        cfg,
 	}
 }
@@ -94,24 +91,5 @@ func (h *Handler) Process() {
 
 	if err := h.writerService.GetAllResults(); err != nil {
 		log.Fatal(err)
-	}
-}
-
-func lineCounter(r io.Reader) (int, error) {
-	buf := make([]byte, 32*1024)
-	count := 0
-	lineSep := []byte{'\n'}
-
-	for {
-		c, err := r.Read(buf)
-		count += bytes.Count(buf[:c], lineSep)
-
-		switch {
-		case err == io.EOF:
-			return count, nil
-
-		case err != nil:
-			return count, err
-		}
 	}
 }
