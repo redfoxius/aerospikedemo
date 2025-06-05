@@ -25,7 +25,8 @@ type Config struct {
 	InputFilename  string
 	OutputFilename string
 
-	Workers int
+	Workers   int
+	BatchSize int
 }
 
 func NewConfig() *Config {
@@ -41,6 +42,7 @@ func NewConfig() *Config {
 	aeroSpikeTimeout, _ := time.ParseDuration(os.Getenv("AEROSPIKE_TIMEOUT"))
 	aeroSpikeTTL, _ := strconv.Atoi(os.Getenv("AEROSPIKE_TTL"))
 	workersNum, _ := strconv.Atoi(os.Getenv("WORKERS"))
+	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 
 	inputPtr := flag.String("in", "ip.txt", "Filename/path for input file, a string.")
 	outputPtr := flag.String("out", "result.txt", "Filename/path for output file, a string.")
@@ -62,5 +64,7 @@ func NewConfig() *Config {
 		InputFilename:  *inputPtr,
 		OutputFilename: *outputPtr,
 		Workers:        workersNum,
+		BatchSize:      batchSize,
+		StartTime:      time.Now(),
 	}
 }

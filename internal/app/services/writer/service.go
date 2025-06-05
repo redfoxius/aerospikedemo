@@ -17,6 +17,11 @@ type Service struct {
 	readPolicy  *aerospike.BasePolicy
 }
 
+type BatchRecord struct {
+	key  *aerospike.Key
+	bins aerospike.BinMap
+}
+
 const (
 	IP_BIN    = "ip"
 	COUNT_BIN = "count"
@@ -40,45 +45,35 @@ func NewWriterService(cfg *config.Config) *Service {
 	return s
 }
 
-func (s *Service) UpdateCounter(key string) error {
-	k, err := aerospike.NewKey(s.config.Namespace, s.config.Set, key)
-	if err != nil {
-		log.Println("Error creating aerospike key")
-		return err
+func (s *Service) FlushBatch(batch []string) error {
+	batchRecords := make([]aerospike.BatchRecordIfc, 0, s.config.BatchSize)
+	for _, k := range batch {
+		key, err := aerospike.NewKey(s.config.Namespace, s.config.Set, k)
+		if err != nil {
+			log.Printf("Error creating aerospike key: %s\n", k)
+			continue
+		}
+		record := aerospike.NewBatchWrite(
+			nil,
+			key,
+			aerospike.PutOp(aerospike.NewBin(IP_BIN, k)),
+			aerospike.AddOp(aerospike.NewBin(COUNT_BIN, 1)),
+		)
+		batchRecords = append(batchRecords, record)
 	}
 
-	// Attempt to get the record
-	_, err = s.cli.Get(s.readPolicy, k)
-
-	// Check if record exists
+	err := s.cli.BatchOperate(nil, batchRecords)
 	if err != nil {
-		if err.Matches(aerospike.ErrKeyNotFound.ResultCode) {
-			// Create the record if it does not exist
-			bins := aerospike.BinMap{}
-			bins[IP_BIN] = key
-			bins[COUNT_BIN] = 1
-			err = s.cli.Put(s.writePolicy, k, bins)
-			if err != nil {
-				log.Println("Error creating aerospike record")
-				return err
-			}
-		} else {
-			log.Println("Error getting aerospike record")
-			return err
-		}
-	} else {
-		counterBin := aerospike.NewBin(COUNT_BIN, 1)
-		err = s.cli.AddBins(s.writePolicy, k, counterBin)
-		if err != nil {
-			log.Println("Error incr bin to aerospike")
-			return err
-		}
+		log.Printf("Error flushing batch records: %s", err)
+		return err
 	}
 
 	return nil
 }
 
 func (s *Service) GetAllResults() error {
+	totalRecords := uint32(0)
+
 	// Create a scan policy
 	policy := aerospike.NewScanPolicy()
 
@@ -107,11 +102,17 @@ func (s *Service) GetAllResults() error {
 		if _, err := f.Write([]byte(fmt.Sprintf("%v , count=%v\n", rec.Record.Bins[IP_BIN], rec.Record.Bins[COUNT_BIN]))); err != nil {
 			log.Printf("Error processing record: %v", rec.Record)
 			return err
+		} else {
+			totalRecords += uint32(rec.Record.Bins[COUNT_BIN].(int))
 		}
 	}
 
 	if _, err := f.Write([]byte(fmt.Sprintf("\nTotal time %s", time.Since(s.config.StartTime)))); err != nil {
 		log.Printf("Error adding total time to result file")
+		return err
+	}
+	if _, err := f.Write([]byte(fmt.Sprintf("\nTotal count %v", totalRecords))); err != nil {
+		log.Printf("Error adding total count to result file")
 		return err
 	}
 

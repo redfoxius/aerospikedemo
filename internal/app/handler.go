@@ -4,8 +4,13 @@ import (
 	"aerospikedemo/internal/app/config"
 	"aerospikedemo/internal/app/services/reader"
 	"aerospikedemo/internal/app/services/writer"
+	"bufio"
+	"bytes"
+	"io"
 	"log"
+	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,31 +29,62 @@ func NewHandler(cfg *config.Config) *Handler {
 	}
 }
 
-func (h *Handler) consumeIPs(ch chan string) {
+func (h *Handler) consumeIPs(ch chan string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	batch := make([]string, 0, h.config.BatchSize)
+
 	for val := range ch { // Receive values from the channel until it's closed
-		if err := h.writerService.UpdateCounter(val); err != nil {
-			log.Printf("Error updating counter: %s", err)
+		batch = append(batch, val)
+		if len(batch) == h.config.BatchSize {
+			h.writerService.FlushBatch(batch)
+			batch = make([]string, 0, h.config.BatchSize)
 		}
+
+	}
+	if len(batch) > 0 {
+		h.writerService.FlushBatch(batch)
 	}
 }
 
 func (h *Handler) Process() {
-	ips := make(chan string, 100)
+	ips := make(chan string, h.config.Workers)
 
-	file, scanner := h.readerService.GetFileScanner()
+	// Count number of lines in input file
+	file, err := os.Open(h.config.InputFilename)
+	if err != nil {
+		log.Fatalf("failed to open file: %s", err)
+	}
+	linesNum, err := lineCounter(file)
+	if err != nil {
+		log.Printf("Error counting lines number for %s\n", h.config.InputFilename)
+	} else {
+		log.Printf("Number of lines in %s is %v\n", h.config.InputFilename, linesNum)
+	}
+
+	// Open input file
+	file, err = os.Open(h.config.InputFilename)
+	if err != nil {
+		log.Fatalf("failed to open file: %s", err)
+	}
+	log.Printf("Reading file %s is started\n", h.config.InputFilename)
 	defer file.Close()
 
+	var wg sync.WaitGroup
 	for i := 0; i < h.config.Workers; i++ {
-		go h.consumeIPs(ips)
+		wg.Add(1)
+		go h.consumeIPs(ips, &wg)
 	}
 	log.Printf("Started %v workers\n", h.config.Workers)
 
 	// Loop through the file and read each line
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		val := strings.TrimSuffix(scanner.Text(), "\n")
 		ips <- val
 	}
 	close(ips)
+	wg.Wait()
 	log.Printf("Reading file %s is completed in %s\n", h.config.InputFilename, time.Since(h.config.StartTime))
 
 	// Check for errors during the scan
@@ -58,5 +94,24 @@ func (h *Handler) Process() {
 
 	if err := h.writerService.GetAllResults(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func lineCounter(r io.Reader) (int, error) {
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := r.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
 	}
 }
