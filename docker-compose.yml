@@ -5,8 +5,8 @@ services:
       - "3000:3000"
     ulimits:
       nofile:
-        soft: 15000
-        hard: 15000
+        soft: 50000
+        hard: 50000
     volumes:
       - ./aerospike.conf:/etc/aerospike/aerospike.conf
 

@@ -25,6 +25,7 @@ func NewHandler(cfg *config.Config) *Handler {
 }
 
 func (f *Handler) Process() {
+
 	file, scanner := f.readerService.GetFileScanner()
 	defer file.Close()
 
@@ -42,5 +43,7 @@ func (f *Handler) Process() {
 		log.Fatalf("error reading file: %s", err)
 	}
 
-	f.writerService.GetAllResults()
+	if err := f.writerService.GetAllResults(); err != nil {
+		log.Fatal(err)
+	}
 }

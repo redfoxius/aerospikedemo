@@ -15,7 +15,6 @@ type Config struct {
 	Port      int
 	Namespace string
 	Set       string
-	Bin       string
 
 	Mode string
 
@@ -26,8 +25,7 @@ type Config struct {
 }
 
 const (
-	AEROSPIKE_SET     = "ip_counters"
-	AEROSPIKE_SET_BIN = "count"
+	AEROSPIKE_SET = "ip_counters_1"
 )
 
 func NewConfig() *Config {
@@ -54,7 +52,6 @@ func NewConfig() *Config {
 		Port:           aeroSpikePort,
 		Namespace:      aeroSpikeNamespace,
 		Set:            AEROSPIKE_SET,
-		Bin:            AEROSPIKE_SET_BIN,
 		Mode:           *modePtr,
 		InputFilename:  *inputPtr,
 		OutputFilename: *outputPtr,
