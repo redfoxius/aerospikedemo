@@ -10,7 +10,7 @@ import (
 )
 
 type Service struct {
-	Config *config.Config
+	config *config.Config
 
 	cli         *aerospike.Client
 	writePolicy *aerospike.WritePolicy
@@ -19,7 +19,7 @@ type Service struct {
 
 func NewWriterService(cfg *config.Config) *Service {
 	service := new(Service)
-	service.Config = cfg
+	service.config = cfg
 
 	var err error
 	service.cli, err = aerospike.NewClient(cfg.Host, cfg.Port)
@@ -35,12 +35,12 @@ func NewWriterService(cfg *config.Config) *Service {
 }
 
 func (s *Service) UpdateCounter(key string) error {
-	k, err := aerospike.NewKey(s.Config.Namespace, s.Config.Set, key)
+	k, err := aerospike.NewKey(s.config.Namespace, s.config.Set, key)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	counterBin := aerospike.NewBin(s.Config.Bin, 1)
+	counterBin := aerospike.NewBin(s.config.Bin, 1)
 	err = s.cli.AddBins(s.writePolicy, k, counterBin)
 	if err != nil {
 		log.Fatal(err)
@@ -54,17 +54,18 @@ func (s *Service) GetAllResults() {
 	policy := aerospike.NewScanPolicy()
 
 	// Initialize the scan
-	scan, err := s.cli.ScanAll(policy, s.Config.Namespace, s.Config.Set)
-	if err != nil {
-		log.Fatal(err)
+	scan, asErr := s.cli.ScanAll(policy, s.config.Namespace, s.config.Set)
+	if asErr != nil {
+		log.Fatal(asErr)
 	}
 
 	// If the file doesn't exist, create it, or append to the file
-	f, er := os.OpenFile("app/result.txt", os.O_CREATE|os.O_WRONLY, 0644)
-	if er != nil {
+	f, err := os.OpenFile(s.config.OutputFilename, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
+	log.Printf("File %s is opened for writing\n", s.config.OutputFilename)
 
 	// Process each record
 	for rec := range scan.Results() {
@@ -72,15 +73,14 @@ func (s *Service) GetAllResults() {
 			log.Printf("Error reading record: %v", rec.Err)
 			continue
 		}
-		if _, err := f.Write([]byte(fmt.Sprintf("%s , count=%s", rec.Record.Key.String(), rec.Record.Bins[s.Config.Bin].(int)))); err != nil {
+		if _, err := f.Write([]byte(fmt.Sprintf("%s , count=%s", rec.Record.Key.String(), rec.Record.Bins[s.config.Bin].(int)))); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	elapsed := time.Since(s.Config.StartTime)
-	if _, err := f.Write([]byte(fmt.Sprintf("Total time %s", elapsed))); err != nil {
+	if _, err := f.Write([]byte(fmt.Sprintf("Total time %s", time.Since(s.config.StartTime)))); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Scan complete")
+	log.Printf("Writing file %s is completed\n", s.config.OutputFilename)
 }
