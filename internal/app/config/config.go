@@ -15,6 +15,8 @@ type Config struct {
 	Port      int
 	Namespace string
 	Set       string
+	Timeout   time.Duration
+	TTL       int
 
 	Mode string
 
@@ -22,11 +24,9 @@ type Config struct {
 
 	InputFilename  string
 	OutputFilename string
-}
 
-const (
-	AEROSPIKE_SET = "ip_counters_1"
-)
+	Workers int
+}
 
 func NewConfig() *Config {
 	err := godotenv.Load()
@@ -37,6 +37,10 @@ func NewConfig() *Config {
 	aeroSpikeHost := os.Getenv("AEROSPIKE_HOST")
 	aeroSpikePort, _ := strconv.Atoi(os.Getenv("AEROSPIKE_PORT"))
 	aeroSpikeNamespace := os.Getenv("AEROSPIKE_NAMESPACE")
+	aeroSpikeSetName := os.Getenv("AEROSPIKE_SET")
+	aeroSpikeTimeout, _ := time.ParseDuration(os.Getenv("AEROSPIKE_TIMEOUT"))
+	aeroSpikeTTL, _ := strconv.Atoi(os.Getenv("AEROSPIKE_TTL"))
+	workersNum, _ := strconv.Atoi(os.Getenv("WORKERS"))
 
 	inputPtr := flag.String("in", "ip.txt", "Filename/path for input file, a string.")
 	outputPtr := flag.String("out", "result.txt", "Filename/path for output file, a string.")
@@ -51,9 +55,12 @@ func NewConfig() *Config {
 		Host:           aeroSpikeHost,
 		Port:           aeroSpikePort,
 		Namespace:      aeroSpikeNamespace,
-		Set:            AEROSPIKE_SET,
+		Set:            aeroSpikeSetName,
+		Timeout:        aeroSpikeTimeout,
+		TTL:            aeroSpikeTTL,
 		Mode:           *modePtr,
 		InputFilename:  *inputPtr,
 		OutputFilename: *outputPtr,
+		Workers:        workersNum,
 	}
 }

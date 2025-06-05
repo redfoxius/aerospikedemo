@@ -33,8 +33,8 @@ func NewWriterService(cfg *config.Config) *Service {
 	}
 
 	s.writePolicy = aerospike.NewWritePolicy(0, 0)
-	s.writePolicy.TotalTimeout = 5000 * time.Millisecond
-	s.writePolicy.Expiration = 60 * 10 // 10 minutes
+	s.writePolicy.TotalTimeout = s.config.Timeout * time.Millisecond
+	s.writePolicy.Expiration = uint32(s.config.TTL) // TTL 1h
 	s.readPolicy = aerospike.NewPolicy()
 
 	return s
@@ -53,9 +53,7 @@ func (s *Service) UpdateCounter(key string) error {
 	// Check if record exists
 	if err != nil {
 		if err.Matches(aerospike.ErrKeyNotFound.ResultCode) {
-			//log.Println("Record does not exist, creating it.")
 			// Create the record if it does not exist
-			// Define bins to update
 			bins := aerospike.BinMap{}
 			bins[IP_BIN] = key
 			bins[COUNT_BIN] = 1
@@ -69,20 +67,12 @@ func (s *Service) UpdateCounter(key string) error {
 			return err
 		}
 	} else {
-		//log.Println("Record exists, updating it.")
-		// Update the record if it exists
 		counterBin := aerospike.NewBin(COUNT_BIN, 1)
 		err = s.cli.AddBins(s.writePolicy, k, counterBin)
 		if err != nil {
 			log.Println("Error incr bin to aerospike")
 			return err
 		}
-		//record, err = s.cli.Get(nil, k)
-		//if err != nil {
-		//	log.Println("Error getting aerospike record")
-		//	return err
-		//}
-		//log.Printf("Record after update: %v\n", record.Bins)
 	}
 
 	return nil
@@ -120,7 +110,7 @@ func (s *Service) GetAllResults() error {
 		}
 	}
 
-	if _, err := f.Write([]byte(fmt.Sprintf("Total time %s", time.Since(s.config.StartTime)))); err != nil {
+	if _, err := f.Write([]byte(fmt.Sprintf("\nTotal time %s", time.Since(s.config.StartTime)))); err != nil {
 		log.Printf("Error adding total time to result file")
 		return err
 	}

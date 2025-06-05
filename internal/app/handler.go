@@ -24,26 +24,39 @@ func NewHandler(cfg *config.Config) *Handler {
 	}
 }
 
-func (f *Handler) Process() {
+func (h *Handler) consumeIPs(ch chan string) {
+	for val := range ch { // Receive values from the channel until it's closed
+		if err := h.writerService.UpdateCounter(val); err != nil {
+			log.Printf("Error updating counter: %s", err)
+		}
+	}
+}
 
-	file, scanner := f.readerService.GetFileScanner()
+func (h *Handler) Process() {
+	ips := make(chan string, 100)
+
+	file, scanner := h.readerService.GetFileScanner()
 	defer file.Close()
+
+	for i := 0; i < h.config.Workers; i++ {
+		go h.consumeIPs(ips)
+	}
+	log.Printf("Started %v workers\n", h.config.Workers)
 
 	// Loop through the file and read each line
 	for scanner.Scan() {
-		line := strings.TrimSuffix(scanner.Text(), "\n")
-		if err := f.writerService.UpdateCounter(line); err != nil {
-			log.Fatal(err)
-		}
+		val := strings.TrimSuffix(scanner.Text(), "\n")
+		ips <- val
 	}
-	log.Printf("Reading file %s is completed in %s\n", f.config.InputFilename, time.Since(f.config.StartTime))
+	close(ips)
+	log.Printf("Reading file %s is completed in %s\n", h.config.InputFilename, time.Since(h.config.StartTime))
 
 	// Check for errors during the scan
 	if err := scanner.Err(); err != nil {
 		log.Fatalf("error reading file: %s", err)
 	}
 
-	if err := f.writerService.GetAllResults(); err != nil {
+	if err := h.writerService.GetAllResults(); err != nil {
 		log.Fatal(err)
 	}
 }
