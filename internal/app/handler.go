@@ -4,8 +4,6 @@ import (
 	"aerospikedemo/internal/app/config"
 	"aerospikedemo/internal/app/services/writer"
 	"bufio"
-	"bytes"
-	"io"
 	"log"
 	"os"
 	"strings"
@@ -44,13 +42,14 @@ func (h *Handler) consumeIPs(ch chan string, wg *sync.WaitGroup) {
 	}
 }
 
-func (h *Handler) Process() {
+func (h *Handler) Process() error {
 	ips := make(chan string, h.config.Workers)
 
 	// Count number of lines in input file
 	file, err := os.Open(h.config.InputFilename)
 	if err != nil {
-		log.Fatalf("failed to open file: %s", err)
+		log.Printf("error opening file %s: %s", h.config.InputFilename, err)
+		return err
 	}
 	linesNum, err := lineCounter(file)
 	if err != nil {
@@ -62,7 +61,8 @@ func (h *Handler) Process() {
 	// Open input file
 	file, err = os.Open(h.config.InputFilename)
 	if err != nil {
-		log.Fatalf("failed to open file: %s", err)
+		log.Printf("error opening file %s: %s", h.config.InputFilename, err)
+		return err
 	}
 	log.Printf("Reading file %s is started\n", h.config.InputFilename)
 	defer file.Close()
@@ -86,10 +86,14 @@ func (h *Handler) Process() {
 
 	// Check for errors during the scan
 	if err := scanner.Err(); err != nil {
-		log.Fatalf("error reading file: %s", err)
+		log.Printf("error reading file: %s", err)
+		return err
 	}
 
 	if err := h.writerService.GetAllResults(); err != nil {
-		log.Fatal(err)
+		log.Printf("Error flushing results from database to file: %s", err)
+		return err
 	}
+
+	return nil
 }
